@@ -1,0 +1,8 @@
+var/
+.idea/
+vendor/
+composer.lock
+.phpunit.result.cache
+coverage/
+*.log
+.DS_Store
