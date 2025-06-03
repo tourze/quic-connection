@@ -1,8 +1,12 @@
 var/
-.idea/
 vendor/
-composer.lock
-.phpunit.result.cache
+.idea/
+.phpunit.cache/
 coverage/
-*.log
+composer.lock
+.php-cs-fixer.cache
+.phpunit.result.cache
+phpunit.xml
 .DS_Store
+*.cache
+*.log
