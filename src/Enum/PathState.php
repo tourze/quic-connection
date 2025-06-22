@@ -4,14 +4,23 @@ declare(strict_types=1);
 
 namespace Tourze\QUIC\Connection\Enum;
 
+use Tourze\EnumExtra\Itemable;
+use Tourze\EnumExtra\ItemTrait;
+use Tourze\EnumExtra\Labelable;
+use Tourze\EnumExtra\Selectable;
+use Tourze\EnumExtra\SelectTrait;
+
 /**
  * QUIC路径状态枚举
  * 
  * 定义连接路径的验证状态
  * 参考：RFC 9000 Section 8.2
  */
-enum PathState: string
+enum PathState: string implements Itemable, Labelable, Selectable
 {
+    use ItemTrait;
+    use SelectTrait;
+
     case UNVALIDATED = 'unvalidated';
     case PROBING = 'probing';
     case VALIDATED = 'validated';
@@ -39,5 +48,18 @@ enum PathState: string
     public function isFailed(): bool
     {
         return $this === self::FAILED;
+    }
+
+    /**
+     * 获取枚举值的标签
+     */
+    public function getLabel(): string
+    {
+        return match ($this) {
+            self::UNVALIDATED => '未验证',
+            self::PROBING => '探测中',
+            self::VALIDATED => '已验证',
+            self::FAILED => '已失效',
+        };
     }
 } 

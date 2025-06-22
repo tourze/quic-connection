@@ -84,10 +84,10 @@ class Connection
         // 更新活动时间
         $this->idleTimeoutManager->updateActivity();
         
-        // TODO: 更新远程连接ID
-        // if ($this->remoteConnectionId === null) {
-        //     $this->remoteConnectionId = $packet->getSourceConnectionId();
-        // }
+        // 更新远程连接ID
+        if ($this->remoteConnectionId === null && method_exists($packet, 'getSourceConnectionId')) {
+            $this->remoteConnectionId = $packet->getSourceConnectionId();
+        }
 
         // 处理包中的帧
         $frames = $this->extractFrames($packet);

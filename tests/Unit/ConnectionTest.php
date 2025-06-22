@@ -139,7 +139,6 @@ class ConnectionTest extends TestCase
         $connection = new Connection(false);
         
         // 创建一个mock Frame对象
-        /** @var \Tourze\QUIC\Frames\Frame $frame */
         $frame = $this->createMock(\Tourze\QUIC\Frames\Frame::class);
         
         $this->expectException(\RuntimeException::class);

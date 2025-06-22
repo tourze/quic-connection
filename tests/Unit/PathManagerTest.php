@@ -121,8 +121,6 @@ class PathManagerTest extends TestCase
     public function test_get_validated_paths_initially_empty(): void
     {
         $validatedPaths = $this->pathManager->getValidatedPaths();
-
-        $this->assertIsArray($validatedPaths);
         $this->assertEmpty($validatedPaths);
     }
 

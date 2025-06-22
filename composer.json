@@ -5,6 +5,7 @@
   "license": "MIT",
   "require": {
     "php": "^8.1",
+    "tourze/enum-extra": "0.1.*",
     "tourze/quic-congestion": "0.0.*",
     "tourze/quic-core": "0.0.*",
     "tourze/quic-frames": "0.0.*",

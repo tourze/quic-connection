@@ -107,7 +107,8 @@ class ConnectionStateMachine
     private function onConnected(): void
     {
         // 连接建立成功，可以开始传输应用数据
-        // 可以触发连接建立事件
+        // 触发连接建立事件
+        $this->connection->triggerEvent('connected');
     }
 
     /**
@@ -135,6 +136,7 @@ class ConnectionStateMachine
     {
         // 清理所有资源
         // 触发连接关闭事件
+        $this->connection->triggerEvent('closed', $this->closeInfo);
     }
 
     /**
@@ -193,8 +195,12 @@ class ConnectionStateMachine
         $frameData .= pack('n', strlen($reason)) . $reason;
 
         // TODO: 发送CONNECTION_CLOSE帧
+        // 当有具体的ConnectionCloseFrame类时，取消下面的注释
         // $frame = new ConnectionCloseFrame($frameData);
         // $this->connection->sendFrame($frame);
+        
+        // 暂时触发关闭事件，让外部处理
+        $this->connection->triggerEvent('sendConnectionClose', ['frameData' => $frameData]);
     }
 
     /**
