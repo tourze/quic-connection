@@ -8,7 +8,7 @@ use Tourze\QUIC\Core\Constants;
 
 /**
  * QUIC连接工厂
- * 
+ *
  * 负责创建和配置QUIC连接实例
  */
 class ConnectionFactory

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Tourze\QUIC\Connection;
 
+use Tourze\QUIC\Connection\Exception\QuicConnectionException;
+
 /**
  * QUIC连接管理器
- * 
+ *
  * 管理多个QUIC连接的生命周期和调度
  * 参考：RFC 9000
  */
@@ -38,7 +40,7 @@ class ConnectionManager
     public function addConnection(Connection $connection): void
     {
         if (count($this->connections) >= $this->maxConnections) {
-            throw new \RuntimeException('连接数已达上限');
+            throw new QuicConnectionException('连接数已达上限');
         }
 
         $connectionId = $connection->getLocalConnectionId();

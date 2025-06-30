@@ -6,7 +6,7 @@ namespace Tourze\QUIC\Connection\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use Tourze\QUIC\Connection\ConnectionFactory;
-use Tourze\QUIC\Connection\Enum\ConnectionState;
+use Tourze\QUIC\Core\Enum\ConnectionState;
 
 /**
  * ConnectionFactory 类单元测试

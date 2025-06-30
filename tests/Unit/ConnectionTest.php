@@ -6,7 +6,7 @@ namespace Tourze\QUIC\Connection\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use Tourze\QUIC\Connection\Connection;
-use Tourze\QUIC\Connection\Enum\ConnectionState;
+use Tourze\QUIC\Core\Enum\ConnectionState;
 
 /**
  * Connection 类单元测试
@@ -200,6 +200,6 @@ class ConnectionTest extends TestCase
         $this->expectExceptionMessage('无效状态转换');
         
         // 尝试从NEW直接转到CONNECTED，这是无效的
-        $connection->getStateMachine()->transitionTo(\Tourze\QUIC\Connection\Enum\ConnectionState::CONNECTED);
+        $connection->getStateMachine()->transitionTo(\Tourze\QUIC\Core\Enum\ConnectionState::CONNECTED);
     }
 } 

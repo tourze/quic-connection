@@ -6,7 +6,7 @@ namespace Tourze\QUIC\Connection;
 
 /**
  * QUIC连接事件接口
- * 
+ *
  * 定义连接事件处理器的标准接口
  */
 interface ConnectionEventInterface

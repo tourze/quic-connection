@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Tourze\QUIC\Connection;
 
-use Tourze\QUIC\Connection\Enum\ConnectionState;
+use Tourze\QUIC\Connection\Exception\InvalidConnectionStateException;
+use Tourze\QUIC\Core\Enum\ConnectionState;
 
 /**
  * QUIC连接状态机
- * 
+ *
  * 管理连接状态转换和生命周期
  * 参考：RFC 9000 Section 4
  */
@@ -46,7 +47,7 @@ class ConnectionStateMachine
     public function transitionTo(ConnectionState $newState): void
     {
         if (!$this->isValidTransition($this->state, $newState)) {
-            throw new \InvalidArgumentException(
+            throw new InvalidConnectionStateException(
                 sprintf('无效状态转换：%s -> %s', $this->state->value, $newState->value)
             );
         }
@@ -118,6 +119,9 @@ class ConnectionStateMachine
     {
         // 发送CONNECTION_CLOSE帧
         $this->sendConnectionClose();
+        
+        // 在实际实现中，应该等待确认或超时后再转换到CLOSED状态
+        // 这里不自动转换，让调用者决定何时转换到CLOSED
     }
 
     /**
@@ -137,6 +141,10 @@ class ConnectionStateMachine
         // 清理所有资源
         // 触发连接关闭事件
         $this->connection->triggerEvent('closed', $this->closeInfo);
+        $this->connection->triggerEvent('disconnected', [
+            'errorCode' => $this->closeInfo['errorCode'],
+            'reason' => $this->closeInfo['reason']
+        ]);
     }
 
     /**
@@ -216,7 +224,8 @@ class ConnectionStateMachine
      */
     public function canSendData(): bool
     {
-        return $this->state->canSendData();
+        // 只有在CONNECTED状态才能发送应用数据
+        return $this->state === ConnectionState::CONNECTED;
     }
 
     /**
@@ -224,6 +233,11 @@ class ConnectionStateMachine
      */
     public function canReceiveData(): bool
     {
-        return $this->state->canReceiveData();
+        // 只有在HANDSHAKING和CONNECTED状态才能接收数据
+        // CLOSING和DRAINING状态不应该接收新数据
+        return in_array($this->state, [
+            ConnectionState::HANDSHAKING,
+            ConnectionState::CONNECTED
+        ]);
     }
 } 

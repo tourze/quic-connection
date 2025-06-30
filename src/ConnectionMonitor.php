@@ -6,7 +6,7 @@ namespace Tourze\QUIC\Connection;
 
 /**
  * QUIC连接监控器
- * 
+ *
  * 监控连接状态、性能指标和健康状况
  */
 class ConnectionMonitor
@@ -48,12 +48,12 @@ class ConnectionMonitor
      */
     private function registerEventHandlers(): void
     {
-        $this->connection->onEvent('connected', [$this, 'onConnected']);
-        $this->connection->onEvent('disconnected', [$this, 'onDisconnected']);
-        $this->connection->onEvent('error', [$this, 'onError']);
-        $this->connection->onEvent('packet_sent', [$this, 'onPacketSent']);
-        $this->connection->onEvent('packet_received', [$this, 'onPacketReceived']);
-        $this->connection->onEvent('state_changed', [$this, 'onStateChanged']);
+        $this->connection->onEvent('connected', $this->onConnected(...));
+        $this->connection->onEvent('disconnected', $this->onDisconnected(...));
+        $this->connection->onEvent('error', $this->onError(...));
+        $this->connection->onEvent('packet_sent', $this->onPacketSent(...));
+        $this->connection->onEvent('packet_received', $this->onPacketReceived(...));
+        $this->connection->onEvent('state_changed', $this->onStateChanged(...));
     }
 
     /**

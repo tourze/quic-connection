@@ -8,13 +8,14 @@ use Tourze\QUIC\Core\Constants;
 
 /**
  * QUIC连接空闲超时管理器
- * 
+ *
  * 管理连接的空闲超时检测和处理
  * 参考：RFC 9000 Section 10.1
  */
 class IdleTimeoutManager
 {
     private readonly ConnectionStateMachine $stateMachine;
+    private ?Connection $connection = null;
     
     /**
      * 空闲超时时间（毫秒）
@@ -91,7 +92,20 @@ class IdleTimeoutManager
      */
     private function handleTimeout(): void
     {
+        // 触发超时事件
+        if ($this->connection !== null) {
+            $this->connection->triggerEvent('timeout', ['reason' => 'idle timeout']);
+        }
+        
         $this->stateMachine->close(0, 'idle timeout');
+    }
+    
+    /**
+     * 设置关联的连接对象
+     */
+    public function setConnection(Connection $connection): void
+    {
+        $this->connection = $connection;
     }
 
     /**

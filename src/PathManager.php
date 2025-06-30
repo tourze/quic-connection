@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace Tourze\QUIC\Connection;
 
 use Tourze\QUIC\Connection\Enum\PathState;
+use Tourze\QUIC\Connection\Exception\InvalidConnectionStateException;
 use Tourze\QUIC\Core\Constants;
 
 /**
  * QUIC路径管理器
- * 
+ *
  * 管理连接路径的验证、迁移和切换
  * 参考：RFC 9000 Section 8 & 9
  */
@@ -196,7 +197,7 @@ class PathManager
     public function setPreferredAddress(string $address, int $port): void
     {
         if (!$this->isServer) {
-            throw new \InvalidArgumentException('只有服务端可以设置首选地址');
+            throw new InvalidConnectionStateException('只有服务端可以设置首选地址');
         }
 
         $this->preferredAddress = [
@@ -280,5 +281,36 @@ class PathManager
     public function getPreferredAddress(): ?array
     {
         return $this->preferredAddress;
+    }
+    
+    /**
+     * 获取所有路径（包括活跃、已验证和探测中的）
+     */
+    public function getAllPaths(): array
+    {
+        $paths = [];
+        
+        // 添加活跃路径
+        if ($this->activePath !== null) {
+            $key = $this->getPathKey(
+                $this->activePath['local_address'],
+                $this->activePath['local_port'],
+                $this->activePath['remote_address'],
+                $this->activePath['remote_port']
+            );
+            $paths[$key] = $this->activePath;
+        }
+        
+        // 添加已验证路径
+        foreach ($this->validatedPaths as $key => $path) {
+            $paths[$key] = $path;
+        }
+        
+        // 添加探测中的路径
+        foreach ($this->probingPaths as $key => $path) {
+            $paths[$key] = $path;
+        }
+        
+        return array_values($paths);
     }
 } 

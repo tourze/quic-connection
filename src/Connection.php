@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace Tourze\QUIC\Connection;
 
-use Tourze\QUIC\Connection\Enum\ConnectionState;
+use Tourze\QUIC\Connection\Exception\QuicConnectionException;
 use Tourze\QUIC\Core\Constants;
+use Tourze\QUIC\Core\Enum\ConnectionState;
 use Tourze\QUIC\Frames\Frame;
 use Tourze\QUIC\Packets\Packet;
 
 /**
  * QUIC连接主类
- * 
+ *
  * 整合连接状态管理、路径管理、空闲超时等功能
  * 参考：RFC 9000
  */
@@ -59,6 +60,7 @@ class Connection
         $this->stateMachine = new ConnectionStateMachine($this);
         $this->pathManager = new PathManager($isServer);
         $this->idleTimeoutManager = new IdleTimeoutManager($this->stateMachine);
+        $this->idleTimeoutManager->setConnection($this);
         
         $this->transportParameters = Constants::getDefaultTransportParameters();
     }
@@ -66,14 +68,21 @@ class Connection
     /**
      * 建立连接
      */
-    public function connect(string $remoteAddress, int $remotePort, string $localAddress = '0.0.0.0', int $localPort = 0): void
+    public function connect(string $remoteAddress, int $remotePort, string $localAddress = '0.0.0.0', int $localPort = 0): bool
     {
         if ($this->stateMachine->getState() !== ConnectionState::NEW) {
-            throw new \RuntimeException('连接状态错误');
+            throw new QuicConnectionException('连接状态错误');
         }
 
-        $this->pathManager->initializePath($localAddress, $localPort, $remoteAddress, $remotePort);
-        $this->stateMachine->transitionTo(ConnectionState::HANDSHAKING);
+        try {
+            $this->pathManager->initializePath($localAddress, $localPort, $remoteAddress, $remotePort);
+            $this->stateMachine->transitionTo(ConnectionState::HANDSHAKING);
+            $this->triggerEvent('connecting', ['remote_address' => $remoteAddress, 'remote_port' => $remotePort]);
+            return true;
+        } catch (\Exception $e) {
+            $this->triggerEvent('error', ['exception' => $e]);
+            return false;
+        }
     }
 
     /**
@@ -120,7 +129,7 @@ class Connection
     public function sendFrame(Frame $frame): void
     {
         if (!$this->stateMachine->canSendData()) {
-            throw new \RuntimeException('连接状态不允许发送数据');
+            throw new QuicConnectionException('连接状态不允许发送数据');
         }
 
         $this->pendingFrames[] = $frame;
@@ -282,4 +291,69 @@ class Connection
             }
         }
     }
+    
+    /**
+     * 发送数据
+     */
+    public function sendData(string $data): int
+    {
+        if (!$this->stateMachine->canSendData()) {
+            throw new QuicConnectionException('连接状态不允许发送数据');
+        }
+        
+        // TODO: 实现实际的数据发送逻辑
+        // 这里需要将数据封装成流帧并发送
+        
+        $this->triggerEvent('data_sent', ['bytes' => strlen($data)]);
+        $this->idleTimeoutManager->updateActivity();
+        
+        return strlen($data);
+    }
+    
+    /**
+     * 设置QUIC版本
+     */
+    public function setVersion(int $version): void
+    {
+        $this->transportParameters['initial_version'] = $version;
+    }
+    
+    /**
+     * 设置初始版本
+     */
+    public function setInitialVersion(int $version): void
+    {
+        $this->setVersion($version);
+    }
+    
+    /**
+     * 设置初始最大数据量
+     */
+    public function setInitialMaxData(int $maxData): void
+    {
+        $this->transportParameters['initial_max_data'] = $maxData;
+    }
+    
+    /**
+     * 设置初始最大流数据量
+     */
+    public function setInitialMaxStreamData(int $maxStreamData): void
+    {
+        $this->transportParameters['initial_max_stream_data_bidi_local'] = $maxStreamData;
+        $this->transportParameters['initial_max_stream_data_bidi_remote'] = $maxStreamData;
+        $this->transportParameters['initial_max_stream_data_uni'] = $maxStreamData;
+    }
+    
+    /**
+     * 获取连接监控器
+     */
+    public function getMonitor(): ConnectionMonitor
+    {
+        if (!isset($this->monitor)) {
+            $this->monitor = new ConnectionMonitor($this);
+        }
+        return $this->monitor;
+    }
+    
+    private ?ConnectionMonitor $monitor = null;
 } 
