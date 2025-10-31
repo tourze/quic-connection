@@ -33,6 +33,8 @@ interface ConnectionEventInterface
 
     /**
      * 路径切换事件
+     * @param array<string, mixed> $oldPath
+     * @param array<string, mixed> $newPath
      */
     public function onPathChanged(Connection $connection, array $oldPath, array $newPath): void;
-} 
+}

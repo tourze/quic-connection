@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Tourze\QUIC\Connection\Tests\Unit;
+namespace Tourze\QUIC\Connection\Tests;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Tourze\QUIC\Connection\Connection;
 use Tourze\QUIC\Connection\ConnectionStateMachine;
@@ -11,24 +12,30 @@ use Tourze\QUIC\Core\Enum\ConnectionState;
 
 /**
  * ConnectionStateMachine 类单元测试
+ *
+ * @internal
  */
-class ConnectionStateMachineTest extends TestCase
+#[CoversClass(ConnectionStateMachine::class)]
+final class ConnectionStateMachineTest extends TestCase
 {
     private ConnectionStateMachine $stateMachine;
+
     private Connection $connection;
 
     protected function setUp(): void
     {
+        parent::setUp();
+
         $this->connection = new Connection(false);
         $this->stateMachine = $this->connection->getStateMachine();
     }
 
-    public function test_initial_state(): void
+    public function testInitialState(): void
     {
         $this->assertEquals(ConnectionState::NEW, $this->stateMachine->getState());
     }
 
-    public function test_valid_state_transitions(): void
+    public function testValidStateTransitions(): void
     {
         // NEW -> HANDSHAKING
         $this->stateMachine->transitionTo(ConnectionState::HANDSHAKING);
@@ -47,7 +54,7 @@ class ConnectionStateMachineTest extends TestCase
         $this->assertEquals(ConnectionState::CLOSED, $this->stateMachine->getState());
     }
 
-    public function test_invalid_state_transitions(): void
+    public function testInvalidStateTransitions(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('无效状态转换');
@@ -56,7 +63,7 @@ class ConnectionStateMachineTest extends TestCase
         $this->stateMachine->transitionTo(ConnectionState::CONNECTED);
     }
 
-    public function test_can_send_data_states(): void
+    public function testCanSendDataStates(): void
     {
         // NEW状态不能发送数据
         $this->assertFalse($this->stateMachine->canSendData());
@@ -74,7 +81,7 @@ class ConnectionStateMachineTest extends TestCase
         $this->assertFalse($this->stateMachine->canSendData());
     }
 
-    public function test_can_receive_data_states(): void
+    public function testCanReceiveDataStates(): void
     {
         // NEW状态不能接收数据
         $this->assertFalse($this->stateMachine->canReceiveData());
@@ -92,7 +99,7 @@ class ConnectionStateMachineTest extends TestCase
         $this->assertFalse($this->stateMachine->canReceiveData());
     }
 
-    public function test_close_from_new_state(): void
+    public function testCloseFromNewState(): void
     {
         $this->stateMachine->close(42, 'test reason');
 
@@ -104,7 +111,7 @@ class ConnectionStateMachineTest extends TestCase
         $this->assertIsInt($closeInfo['timestamp']);
     }
 
-    public function test_close_from_handshaking_state(): void
+    public function testCloseFromHandshakingState(): void
     {
         $this->stateMachine->transitionTo(ConnectionState::HANDSHAKING);
         $this->stateMachine->close(0, 'handshake failed');
@@ -116,12 +123,12 @@ class ConnectionStateMachineTest extends TestCase
         $this->assertEquals('handshake failed', $closeInfo['reason']);
     }
 
-    public function test_immediate_close(): void
+    public function testImmediateClose(): void
     {
         // 正确的状态转换序列
         $this->stateMachine->transitionTo(ConnectionState::HANDSHAKING);
         $this->stateMachine->transitionTo(ConnectionState::CONNECTED);
-        
+
         $this->stateMachine->immediateClose(100, 'connection error', 42);
 
         $this->assertEquals(ConnectionState::DRAINING, $this->stateMachine->getState());
@@ -132,7 +139,7 @@ class ConnectionStateMachineTest extends TestCase
         $this->assertEquals(42, $closeInfo['frameType']);
     }
 
-    public function test_close_when_already_closed(): void
+    public function testCloseWhenAlreadyClosed(): void
     {
         $this->stateMachine->close();
         $this->assertEquals(ConnectionState::CLOSED, $this->stateMachine->getState());
@@ -146,7 +153,7 @@ class ConnectionStateMachineTest extends TestCase
         $this->assertEquals(0, $closeInfo['errorCode']);
     }
 
-    public function test_draining_to_closed_transition(): void
+    public function testDrainingToClosedTransition(): void
     {
         $this->stateMachine->transitionTo(ConnectionState::HANDSHAKING);
         $this->stateMachine->immediateClose(0, 'test close');
@@ -157,4 +164,16 @@ class ConnectionStateMachineTest extends TestCase
         $this->stateMachine->transitionTo(ConnectionState::CLOSED);
         $this->assertEquals(ConnectionState::CLOSED, $this->stateMachine->getState());
     }
-} 
+
+    public function testTransitionTo(): void
+    {
+        // 测试基本状态转换功能
+        $this->assertEquals(ConnectionState::NEW, $this->stateMachine->getState());
+
+        $this->stateMachine->transitionTo(ConnectionState::HANDSHAKING);
+        $this->assertEquals(ConnectionState::HANDSHAKING, $this->stateMachine->getState());
+
+        $this->stateMachine->transitionTo(ConnectionState::CONNECTED);
+        $this->assertEquals(ConnectionState::CONNECTED, $this->stateMachine->getState());
+    }
+}

@@ -19,50 +19,53 @@ use Tourze\QUIC\Packets\Packet;
 class Connection
 {
     private readonly ConnectionStateMachine $stateMachine;
+
     private readonly PathManager $pathManager;
+
     private readonly IdleTimeoutManager $idleTimeoutManager;
-    
+
     /**
      * 本地连接ID
      */
     private readonly string $localConnectionId;
-    
+
     /**
      * 远程连接ID
      */
     private ?string $remoteConnectionId = null;
-    
-    /**
-     * 是否为服务端
-     */
-    private readonly bool $isServer;
-    
+
     /**
      * 传输参数
+     * @var array<string, mixed>
      */
     private array $transportParameters;
-    
+
     /**
      * 待发送的帧队列
+     * @var array<int, Frame>
      */
     private array $pendingFrames = [];
-    
+
     /**
      * 连接事件回调
+     * @var array<string, array<int, callable>>
      */
     private array $eventCallbacks = [];
 
-    public function __construct(bool $isServer = false, ?string $localConnectionId = null)
-    {
-        $this->isServer = $isServer;
+    public function __construct(
+        private readonly bool $isServer = false,
+        ?string $localConnectionId = null,
+    ) {
         $this->localConnectionId = $localConnectionId ?? $this->generateConnectionId();
-        
+
         $this->stateMachine = new ConnectionStateMachine($this);
         $this->pathManager = new PathManager($isServer);
         $this->idleTimeoutManager = new IdleTimeoutManager($this->stateMachine);
         $this->idleTimeoutManager->setConnection($this);
-        
-        $this->transportParameters = Constants::getDefaultTransportParameters();
+
+        /** @var array<string, int> $defaultParams */
+        $defaultParams = Constants::getDefaultTransportParameters();
+        $this->transportParameters = $defaultParams;
     }
 
     /**
@@ -70,7 +73,7 @@ class Connection
      */
     public function connect(string $remoteAddress, int $remotePort, string $localAddress = '0.0.0.0', int $localPort = 0): bool
     {
-        if ($this->stateMachine->getState() !== ConnectionState::NEW) {
+        if (ConnectionState::NEW !== $this->stateMachine->getState()) {
             throw new QuicConnectionException('连接状态错误');
         }
 
@@ -78,9 +81,11 @@ class Connection
             $this->pathManager->initializePath($localAddress, $localPort, $remoteAddress, $remotePort);
             $this->stateMachine->transitionTo(ConnectionState::HANDSHAKING);
             $this->triggerEvent('connecting', ['remote_address' => $remoteAddress, 'remote_port' => $remotePort]);
+
             return true;
         } catch (\Exception $e) {
             $this->triggerEvent('error', ['exception' => $e]);
+
             return false;
         }
     }
@@ -92,10 +97,11 @@ class Connection
     {
         // 更新活动时间
         $this->idleTimeoutManager->updateActivity();
-        
+
         // 更新远程连接ID
-        if ($this->remoteConnectionId === null && method_exists($packet, 'getSourceConnectionId')) {
-            $this->remoteConnectionId = $packet->getSourceConnectionId();
+        if (null === $this->remoteConnectionId && method_exists($packet, 'getSourceConnectionId')) {
+            $sourceId = $packet->getSourceConnectionId();
+            $this->remoteConnectionId = is_string($sourceId) ? $sourceId : null;
         }
 
         // 处理包中的帧
@@ -116,6 +122,7 @@ class Connection
 
     /**
      * 从包中提取帧
+     * @return array<int, Frame>
      */
     private function extractFrames(Packet $packet): array
     {
@@ -151,15 +158,15 @@ class Connection
     {
         // 检查空闲超时
         $this->idleTimeoutManager->checkTimeout();
-        
+
         // 清理路径超时
         $this->pathManager->cleanupTimeoutPaths();
-        
+
         // 发送PING（如果需要）
         if ($this->idleTimeoutManager->shouldSendPing()) {
             $this->sendPing();
         }
-        
+
         // 处理待发送的帧
         $this->flushPendingFrames();
     }
@@ -172,7 +179,7 @@ class Connection
         // TODO: 创建并发送PING帧
         // $pingFrame = new PingFrame();
         // $this->sendFrame($pingFrame);
-        
+
         $this->idleTimeoutManager->updateActivity();
     }
 
@@ -181,14 +188,14 @@ class Connection
      */
     private function flushPendingFrames(): void
     {
-        if (empty($this->pendingFrames)) {
+        if ([] === $this->pendingFrames) {
             return;
         }
 
         // TODO: 将帧打包成包并发送
         // $packet = $this->buildPacket($this->pendingFrames);
         // $this->sendPacket($packet);
-        
+
         $this->pendingFrames = [];
     }
 
@@ -266,6 +273,7 @@ class Connection
 
     /**
      * 获取所有传输参数
+     * @return array<string, mixed>
      */
     public function getTransportParameters(): array
     {
@@ -282,6 +290,7 @@ class Connection
 
     /**
      * 触发事件
+     * @param array<string, mixed> $data
      */
     public function triggerEvent(string $event, array $data = []): void
     {
@@ -291,7 +300,7 @@ class Connection
             }
         }
     }
-    
+
     /**
      * 发送数据
      */
@@ -300,16 +309,16 @@ class Connection
         if (!$this->stateMachine->canSendData()) {
             throw new QuicConnectionException('连接状态不允许发送数据');
         }
-        
+
         // TODO: 实现实际的数据发送逻辑
         // 这里需要将数据封装成流帧并发送
-        
+
         $this->triggerEvent('data_sent', ['bytes' => strlen($data)]);
         $this->idleTimeoutManager->updateActivity();
-        
+
         return strlen($data);
     }
-    
+
     /**
      * 设置QUIC版本
      */
@@ -317,7 +326,7 @@ class Connection
     {
         $this->transportParameters['initial_version'] = $version;
     }
-    
+
     /**
      * 设置初始版本
      */
@@ -325,7 +334,7 @@ class Connection
     {
         $this->setVersion($version);
     }
-    
+
     /**
      * 设置初始最大数据量
      */
@@ -333,7 +342,7 @@ class Connection
     {
         $this->transportParameters['initial_max_data'] = $maxData;
     }
-    
+
     /**
      * 设置初始最大流数据量
      */
@@ -343,7 +352,7 @@ class Connection
         $this->transportParameters['initial_max_stream_data_bidi_remote'] = $maxStreamData;
         $this->transportParameters['initial_max_stream_data_uni'] = $maxStreamData;
     }
-    
+
     /**
      * 获取连接监控器
      */
@@ -352,8 +361,9 @@ class Connection
         if (!isset($this->monitor)) {
             $this->monitor = new ConnectionMonitor($this);
         }
+
         return $this->monitor;
     }
-    
+
     private ?ConnectionMonitor $monitor = null;
-} 
+}

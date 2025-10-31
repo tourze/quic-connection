@@ -14,34 +14,33 @@ use Tourze\QUIC\Core\Constants;
  */
 class IdleTimeoutManager
 {
-    private readonly ConnectionStateMachine $stateMachine;
     private ?Connection $connection = null;
-    
+
     /**
      * 空闲超时时间（毫秒）
      */
     private int $idleTimeout = Constants::DEFAULT_IDLE_TIMEOUT;
-    
+
     /**
      * 最后活动时间（毫秒时间戳）
      */
     private int $lastActivityTime;
-    
+
     /**
      * 是否启用PING探活
      */
     private bool $pingEnabled = true;
-    
+
     /**
      * PING间隔时间（毫秒）
      */
     private int $pingInterval;
 
-    public function __construct(ConnectionStateMachine $stateMachine)
-    {
-        $this->stateMachine = $stateMachine;
-        $this->lastActivityTime = (int)(microtime(true) * 1000);
-        $this->pingInterval = (int)($this->idleTimeout * 0.5); // PING间隔为超时时间的一半
+    public function __construct(
+        private readonly ConnectionStateMachine $stateMachine,
+    ) {
+        $this->lastActivityTime = (int) (microtime(true) * 1000);
+        $this->pingInterval = (int) ($this->idleTimeout * 0.5); // PING间隔为超时时间的一半
     }
 
     /**
@@ -49,7 +48,7 @@ class IdleTimeoutManager
      */
     public function updateActivity(): void
     {
-        $this->lastActivityTime = (int)(microtime(true) * 1000);
+        $this->lastActivityTime = (int) (microtime(true) * 1000);
     }
 
     /**
@@ -61,11 +60,12 @@ class IdleTimeoutManager
             return false;
         }
 
-        $now = (int)(microtime(true) * 1000);
+        $now = (int) (microtime(true) * 1000);
         $idleTime = $now - $this->lastActivityTime;
 
         if ($idleTime >= $this->idleTimeout) {
             $this->handleTimeout();
+
             return true;
         }
 
@@ -81,7 +81,7 @@ class IdleTimeoutManager
             return false;
         }
 
-        $now = (int)(microtime(true) * 1000);
+        $now = (int) (microtime(true) * 1000);
         $idleTime = $now - $this->lastActivityTime;
 
         return $idleTime >= $this->pingInterval;
@@ -93,13 +93,13 @@ class IdleTimeoutManager
     private function handleTimeout(): void
     {
         // 触发超时事件
-        if ($this->connection !== null) {
+        if (null !== $this->connection) {
             $this->connection->triggerEvent('timeout', ['reason' => 'idle timeout']);
         }
-        
+
         $this->stateMachine->close(0, 'idle timeout');
     }
-    
+
     /**
      * 设置关联的连接对象
      */
@@ -114,7 +114,7 @@ class IdleTimeoutManager
     public function setIdleTimeout(int $timeoutMs): void
     {
         $this->idleTimeout = max(0, $timeoutMs);
-        $this->pingInterval = (int)($this->idleTimeout * 0.5);
+        $this->pingInterval = (int) ($this->idleTimeout * 0.5);
     }
 
     /**
@@ -132,7 +132,7 @@ class IdleTimeoutManager
     {
         $this->updateActivity();
         $this->idleTimeout += $extensionMs;
-        $this->pingInterval = (int)($this->idleTimeout * 0.5);
+        $this->pingInterval = (int) ($this->idleTimeout * 0.5);
     }
 
     /**
@@ -148,8 +148,9 @@ class IdleTimeoutManager
      */
     public function getTimeToTimeout(): int
     {
-        $now = (int)(microtime(true) * 1000);
+        $now = (int) (microtime(true) * 1000);
         $idleTime = $now - $this->lastActivityTime;
+
         return max(0, $this->idleTimeout - $idleTime);
     }
 
@@ -162,8 +163,9 @@ class IdleTimeoutManager
             return PHP_INT_MAX;
         }
 
-        $now = (int)(microtime(true) * 1000);
+        $now = (int) (microtime(true) * 1000);
         $idleTime = $now - $this->lastActivityTime;
+
         return max(0, $this->pingInterval - $idleTime);
     }
 
@@ -172,6 +174,6 @@ class IdleTimeoutManager
      */
     public function reset(): void
     {
-        $this->lastActivityTime = (int)(microtime(true) * 1000);
+        $this->lastActivityTime = (int) (microtime(true) * 1000);
     }
-} 
+}

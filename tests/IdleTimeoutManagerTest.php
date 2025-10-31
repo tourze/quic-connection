@@ -2,23 +2,28 @@
 
 declare(strict_types=1);
 
-namespace Tourze\QUIC\Connection\Tests\Unit;
+namespace Tourze\QUIC\Connection\Tests;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Tourze\QUIC\Connection\Connection;
 use Tourze\QUIC\Connection\ConnectionStateMachine;
 use Tourze\QUIC\Connection\IdleTimeoutManager;
 
 /**
- * @covers \Tourze\QUIC\Connection\IdleTimeoutManager
+ * @internal
  */
-class IdleTimeoutManagerTest extends TestCase
+#[CoversClass(IdleTimeoutManager::class)]
+final class IdleTimeoutManagerTest extends TestCase
 {
     private IdleTimeoutManager $timeoutManager;
+
     private ConnectionStateMachine $stateMachine;
 
     protected function setUp(): void
     {
+        parent::setUp();
+
         // Create a real ConnectionStateMachine for testing since mocking enums is problematic
         $connection = new Connection(false, 'test-connection-id');
         $this->stateMachine = $connection->getStateMachine();
@@ -34,7 +39,7 @@ class IdleTimeoutManagerTest extends TestCase
     {
         $timeout = 30000; // 30 seconds
         $this->timeoutManager->setIdleTimeout($timeout);
-        
+
         $this->assertEquals($timeout, $this->timeoutManager->getIdleTimeout());
     }
 
@@ -42,15 +47,15 @@ class IdleTimeoutManagerTest extends TestCase
     {
         // Set a smaller timeout to make the test more predictable
         $this->timeoutManager->setIdleTimeout(10000); // 10 seconds
-        
+
         // Wait a bit to let some time pass
         usleep(5000); // 5ms delay
         $timeAfterDelay = $this->timeoutManager->getTimeToTimeout();
-        
+
         // Update activity - this should reset the timeout
         $this->timeoutManager->updateActivity();
         $timeAfterUpdate = $this->timeoutManager->getTimeToTimeout();
-        
+
         // After updating activity, time to timeout should be greater (closer to full timeout)
         $this->assertGreaterThan($timeAfterDelay, $timeAfterUpdate);
     }
@@ -59,11 +64,53 @@ class IdleTimeoutManagerTest extends TestCase
     {
         // With default timeout, should not timeout immediately
         $this->assertFalse($this->timeoutManager->checkTimeout());
-        
+
         // Set very small timeout
         $this->timeoutManager->setIdleTimeout(1); // 1ms
         usleep(2000); // 2ms delay
-        
+
         $this->assertTrue($this->timeoutManager->checkTimeout());
+    }
+
+    public function testExtendTimeout(): void
+    {
+        $originalTimeout = $this->timeoutManager->getIdleTimeout();
+        $extension = 5000; // 5 seconds
+
+        $this->timeoutManager->extendTimeout($extension);
+
+        $this->assertEquals($originalTimeout + $extension, $this->timeoutManager->getIdleTimeout());
+    }
+
+    public function testReset(): void
+    {
+        // Set small timeout
+        $this->timeoutManager->setIdleTimeout(10000); // 10 seconds
+
+        // Wait a bit
+        usleep(5000); // 5ms delay
+        $timeBeforeReset = $this->timeoutManager->getTimeToTimeout();
+
+        // Reset activity
+        $this->timeoutManager->reset();
+        $timeAfterReset = $this->timeoutManager->getTimeToTimeout();
+
+        // After reset, time to timeout should be greater
+        $this->assertGreaterThan($timeBeforeReset, $timeAfterReset);
+    }
+
+    public function testShouldSendPing(): void
+    {
+        // Set a small timeout to trigger ping condition faster
+        $this->timeoutManager->setIdleTimeout(10000); // 10 seconds, ping at 5 seconds
+
+        // Initially should not need ping
+        $this->assertFalse($this->timeoutManager->shouldSendPing());
+
+        // Set timeout and wait beyond ping interval (which is half of idle timeout)
+        $this->timeoutManager->setIdleTimeout(100); // 100ms, ping at 50ms
+        usleep(60000); // 60ms delay
+
+        $this->assertTrue($this->timeoutManager->shouldSendPing());
     }
 }

@@ -16,19 +16,21 @@ class ConnectionManager
 {
     /**
      * 活跃连接列表
+     * @var array<string, Connection>
      */
     private array $connections = [];
-    
+
     /**
      * 连接ID到连接的映射
+     * @var array<string, string>
      */
     private array $connectionIdMap = [];
-    
+
     /**
      * 最大连接数
      */
     private int $maxConnections = 1000;
-    
+
     /**
      * 连接计数器
      */
@@ -46,7 +48,7 @@ class ConnectionManager
         $connectionId = $connection->getLocalConnectionId();
         $this->connections[$connectionId] = $connection;
         $this->connectionIdMap[$connectionId] = $connectionId;
-        $this->connectionCounter++;
+        ++$this->connectionCounter;
     }
 
     /**
@@ -55,8 +57,7 @@ class ConnectionManager
     public function removeConnection(string $connectionId): void
     {
         if (isset($this->connections[$connectionId])) {
-            unset($this->connections[$connectionId]);
-            unset($this->connectionIdMap[$connectionId]);
+            unset($this->connections[$connectionId], $this->connectionIdMap[$connectionId]);
         }
     }
 
@@ -70,6 +71,7 @@ class ConnectionManager
 
     /**
      * 获取所有连接
+     * @return array<string, Connection>
      */
     public function getAllConnections(): array
     {
@@ -136,6 +138,7 @@ class ConnectionManager
 
     /**
      * 获取连接统计信息
+     * @return array<string, mixed>
      */
     public function getStatistics(): array
     {
@@ -163,4 +166,4 @@ class ConnectionManager
             $connection->close($errorCode, $reason);
         }
     }
-} 
+}

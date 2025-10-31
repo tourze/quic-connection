@@ -16,10 +16,10 @@ use Tourze\QUIC\Core\Enum\ConnectionState;
 class ConnectionStateMachine
 {
     private ConnectionState $state = ConnectionState::NEW;
-    private readonly Connection $connection;
 
     /**
      * 关闭状态信息
+     * @var array<string, mixed>
      */
     private array $closeInfo = [
         'errorCode' => 0,
@@ -28,9 +28,9 @@ class ConnectionStateMachine
         'timestamp' => null,
     ];
 
-    public function __construct(Connection $connection)
-    {
-        $this->connection = $connection;
+    public function __construct(
+        private readonly Connection $connection,
+    ) {
     }
 
     /**
@@ -47,15 +47,11 @@ class ConnectionStateMachine
     public function transitionTo(ConnectionState $newState): void
     {
         if (!$this->isValidTransition($this->state, $newState)) {
-            throw new InvalidConnectionStateException(
-                sprintf('无效状态转换：%s -> %s', $this->state->value, $newState->value)
-            );
+            throw new InvalidConnectionStateException(sprintf('无效状态转换：%s -> %s', $this->state->value, $newState->value));
         }
 
-        $oldState = $this->state;
+        $this->onStateTransition($this->state, $newState);
         $this->state = $newState;
-
-        $this->onStateTransition($oldState, $newState);
     }
 
     /**
@@ -119,7 +115,7 @@ class ConnectionStateMachine
     {
         // 发送CONNECTION_CLOSE帧
         $this->sendConnectionClose();
-        
+
         // 在实际实现中，应该等待确认或超时后再转换到CLOSED状态
         // 这里不自动转换，让调用者决定何时转换到CLOSED
     }
@@ -143,7 +139,7 @@ class ConnectionStateMachine
         $this->connection->triggerEvent('closed', $this->closeInfo);
         $this->connection->triggerEvent('disconnected', [
             'errorCode' => $this->closeInfo['errorCode'],
-            'reason' => $this->closeInfo['reason']
+            'reason' => $this->closeInfo['reason'],
         ]);
     }
 
@@ -163,7 +159,7 @@ class ConnectionStateMachine
             'timestamp' => time(),
         ];
 
-        if ($this->state === ConnectionState::NEW) {
+        if (ConnectionState::NEW === $this->state) {
             $this->transitionTo(ConnectionState::CLOSED);
         } elseif ($this->state->isActive()) {
             $this->transitionTo(ConnectionState::CLOSING);
@@ -194,25 +190,27 @@ class ConnectionStateMachine
     {
         // 编码CONNECTION_CLOSE帧数据
         $frameData = pack('N', $this->closeInfo['errorCode']);
-        
-        if ($this->closeInfo['frameType'] !== null) {
+
+        if (null !== $this->closeInfo['frameType']) {
             $frameData .= pack('N', $this->closeInfo['frameType']);
         }
-        
+
         $reason = $this->closeInfo['reason'];
-        $frameData .= pack('n', strlen($reason)) . $reason;
+        $reasonStr = is_string($reason) ? $reason : '';
+        $frameData .= pack('n', strlen($reasonStr)) . $reasonStr;
 
         // TODO: 发送CONNECTION_CLOSE帧
         // 当有具体的ConnectionCloseFrame类时，取消下面的注释
         // $frame = new ConnectionCloseFrame($frameData);
         // $this->connection->sendFrame($frame);
-        
+
         // 暂时触发关闭事件，让外部处理
         $this->connection->triggerEvent('sendConnectionClose', ['frameData' => $frameData]);
     }
 
     /**
      * 获取关闭信息
+     * @return array<string, mixed>
      */
     public function getCloseInfo(): array
     {
@@ -225,7 +223,7 @@ class ConnectionStateMachine
     public function canSendData(): bool
     {
         // 只有在CONNECTED状态才能发送应用数据
-        return $this->state === ConnectionState::CONNECTED;
+        return ConnectionState::CONNECTED === $this->state;
     }
 
     /**
@@ -237,7 +235,7 @@ class ConnectionStateMachine
         // CLOSING和DRAINING状态不应该接收新数据
         return in_array($this->state, [
             ConnectionState::HANDSHAKING,
-            ConnectionState::CONNECTED
-        ]);
+            ConnectionState::CONNECTED,
+        ], true);
     }
-} 
+}

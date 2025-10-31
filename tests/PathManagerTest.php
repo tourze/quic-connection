@@ -2,25 +2,31 @@
 
 declare(strict_types=1);
 
-namespace Tourze\QUIC\Connection\Tests\Unit;
+namespace Tourze\QUIC\Connection\Tests;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Tourze\QUIC\Connection\Enum\PathState;
 use Tourze\QUIC\Connection\PathManager;
 
 /**
  * PathManager 类单元测试
+ *
+ * @internal
  */
-class PathManagerTest extends TestCase
+#[CoversClass(PathManager::class)]
+final class PathManagerTest extends TestCase
 {
     private PathManager $pathManager;
 
     protected function setUp(): void
     {
+        parent::setUp();
+
         $this->pathManager = new PathManager(false);
     }
 
-    public function test_initialize_path(): void
+    public function testInitializePath(): void
     {
         $this->pathManager->initializePath('192.168.1.10', 8080, '192.168.1.100', 443);
 
@@ -35,7 +41,7 @@ class PathManagerTest extends TestCase
         $this->assertIsInt($activePath['validated_at']);
     }
 
-    public function test_probe_path(): void
+    public function testProbePath(): void
     {
         $this->pathManager->probePath('192.168.1.20', 9090, '192.168.1.200', 8080);
 
@@ -52,7 +58,7 @@ class PathManagerTest extends TestCase
         $this->assertIsInt($path['probe_start']);
     }
 
-    public function test_probe_duplicate_path(): void
+    public function testProbeDuplicatePath(): void
     {
         // 探测同一个路径两次
         $this->pathManager->probePath('192.168.1.20', 9090, '192.168.1.200', 8080);
@@ -64,18 +70,21 @@ class PathManagerTest extends TestCase
         $this->assertCount(1, $probingPaths);
     }
 
-    public function test_handle_path_challenge(): void
+    public function testHandlePathChallenge(): void
     {
         $challengeData = 'test_challenge_data';
         $sourcePath = '192.168.1.10:8080-192.168.1.100:443';
 
+        $initialProbingCount = count($this->pathManager->getProbingPaths());
+
         // 这个方法应该不抛出异常
         $this->pathManager->handlePathChallenge($challengeData, $sourcePath);
 
-        $this->assertTrue(true); // 如果没有异常，测试通过
+        // 验证方法调用后状态没有意外改变
+        $this->assertCount($initialProbingCount, $this->pathManager->getProbingPaths());
     }
 
-    public function test_handle_path_response_invalid(): void
+    public function testHandlePathResponseInvalid(): void
     {
         // 没有进行路径探测时的响应应该返回false
         $result = $this->pathManager->handlePathResponse('invalid_response');
@@ -83,7 +92,7 @@ class PathManagerTest extends TestCase
         $this->assertFalse($result);
     }
 
-    public function test_cleanup_timeout_paths(): void
+    public function testCleanupTimeoutPaths(): void
     {
         // 添加一个探测路径
         $this->pathManager->probePath('192.168.1.20', 9090, '192.168.1.200', 8080);
@@ -97,7 +106,7 @@ class PathManagerTest extends TestCase
         $this->assertCount(1, $this->pathManager->getProbingPaths());
     }
 
-    public function test_set_preferred_address_as_server(): void
+    public function testSetPreferredAddressAsServer(): void
     {
         $serverPathManager = new PathManager(true);
 
@@ -110,7 +119,7 @@ class PathManagerTest extends TestCase
         $this->assertEquals(443, $preferredAddress['port']);
     }
 
-    public function test_set_preferred_address_as_client_should_fail(): void
+    public function testSetPreferredAddressAsClientShouldFail(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('只有服务端可以设置首选地址');
@@ -118,23 +127,56 @@ class PathManagerTest extends TestCase
         $this->pathManager->setPreferredAddress('192.168.1.200', 443);
     }
 
-    public function test_get_validated_paths_initially_empty(): void
+    public function testGetValidatedPathsInitiallyEmpty(): void
     {
         $validatedPaths = $this->pathManager->getValidatedPaths();
         $this->assertEmpty($validatedPaths);
     }
 
-    public function test_get_active_path_initially_null(): void
+    public function testGetActivePathInitiallyNull(): void
     {
         $activePath = $this->pathManager->getActivePath();
 
         $this->assertNull($activePath);
     }
 
-    public function test_get_preferred_address_initially_null(): void
+    public function testGetPreferredAddressInitiallyNull(): void
     {
         $preferredAddress = $this->pathManager->getPreferredAddress();
 
         $this->assertNull($preferredAddress);
     }
-} 
+
+    public function testSwitchToPath(): void
+    {
+        // 首先初始化一个路径作为当前活跃路径
+        $this->pathManager->initializePath('192.168.1.10', 8080, '192.168.1.100', 443);
+
+        // 创建一个新路径用于切换
+        $newPath = [
+            'local_address' => '192.168.1.20',
+            'local_port' => 9090,
+            'remote_address' => '192.168.1.200',
+            'remote_port' => 8080,
+            'state' => PathState::VALIDATED,
+            'validated_at' => time(),
+        ];
+
+        $newPathKey = '192.168.1.20:9090-192.168.1.200:8080';
+
+        // 切换到新路径
+        $this->pathManager->switchToPath($newPathKey, $newPath);
+
+        // 验证新路径已成为活跃路径
+        $activePath = $this->pathManager->getActivePath();
+        $this->assertNotNull($activePath);
+        $this->assertEquals('192.168.1.20', $activePath['local_address']);
+        $this->assertEquals(9090, $activePath['local_port']);
+        $this->assertEquals('192.168.1.200', $activePath['remote_address']);
+        $this->assertEquals(8080, $activePath['remote_port']);
+
+        // 验证原来的活跃路径被移动到已验证路径
+        $validatedPaths = $this->pathManager->getValidatedPaths();
+        $this->assertCount(1, $validatedPaths);
+    }
+}

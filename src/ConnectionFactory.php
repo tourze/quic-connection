@@ -15,18 +15,25 @@ class ConnectionFactory
 {
     /**
      * 默认传输参数
+     * @var array<string, mixed>
      */
     private array $defaultTransportParameters;
-    
+
     /**
      * 默认事件处理器
+     * @var array<string, array<int, callable>>
      */
     private array $defaultEventHandlers = [];
 
+    /**
+     * @param array<string, mixed> $defaultTransportParameters
+     */
     public function __construct(array $defaultTransportParameters = [])
     {
+        /** @var array<string, int> $baseParams */
+        $baseParams = Constants::getDefaultTransportParameters();
         $this->defaultTransportParameters = array_merge(
-            Constants::getDefaultTransportParameters(),
+            $baseParams,
             $defaultTransportParameters
         );
     }
@@ -38,6 +45,7 @@ class ConnectionFactory
     {
         $connection = new Connection(false, $connectionId);
         $this->configureConnection($connection);
+
         return $connection;
     }
 
@@ -48,6 +56,7 @@ class ConnectionFactory
     {
         $connection = new Connection(true, $connectionId);
         $this->configureConnection($connection);
+
         return $connection;
     }
 
@@ -126,4 +135,4 @@ class ConnectionFactory
     {
         $this->setDefaultTransportParameter('initial_max_streams_uni', $maxStreams);
     }
-} 
+}

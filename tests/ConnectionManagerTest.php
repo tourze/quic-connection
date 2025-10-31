@@ -2,32 +2,38 @@
 
 declare(strict_types=1);
 
-namespace Tourze\QUIC\Connection\Tests\Unit;
+namespace Tourze\QUIC\Connection\Tests;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Tourze\QUIC\Connection\Connection;
 use Tourze\QUIC\Connection\ConnectionManager;
 
 /**
  * ConnectionManager 类单元测试
+ *
+ * @internal
  */
-class ConnectionManagerTest extends TestCase
+#[CoversClass(ConnectionManager::class)]
+final class ConnectionManagerTest extends TestCase
 {
     private ConnectionManager $manager;
 
     protected function setUp(): void
     {
+        parent::setUp();
+
         $this->manager = new ConnectionManager();
     }
 
-    public function test_initial_state(): void
+    public function testInitialState(): void
     {
         $this->assertEquals(0, $this->manager->getConnectionCount());
         $this->assertEquals(1000, $this->manager->getMaxConnections());
         $this->assertEmpty($this->manager->getAllConnections());
     }
 
-    public function test_add_connection(): void
+    public function testAddConnection(): void
     {
         $connection = new Connection(false);
         $this->manager->addConnection($connection);
@@ -39,7 +45,7 @@ class ConnectionManagerTest extends TestCase
         $this->assertSame($connection, $retrievedConnection);
     }
 
-    public function test_remove_connection(): void
+    public function testRemoveConnection(): void
     {
         $connection = new Connection(false);
         $connectionId = $connection->getLocalConnectionId();
@@ -52,14 +58,14 @@ class ConnectionManagerTest extends TestCase
         $this->assertNull($this->manager->getConnection($connectionId));
     }
 
-    public function test_remove_non_existent_connection(): void
+    public function testRemoveNonExistentConnection(): void
     {
         // 移除不存在的连接应该不会抛出异常
         $this->manager->removeConnection('non-existent-id');
         $this->assertEquals(0, $this->manager->getConnectionCount());
     }
 
-    public function test_set_max_connections(): void
+    public function testSetMaxConnections(): void
     {
         $this->manager->setMaxConnections(50);
         $this->assertEquals(50, $this->manager->getMaxConnections());
@@ -69,7 +75,7 @@ class ConnectionManagerTest extends TestCase
         $this->assertEquals(1, $this->manager->getMaxConnections()); // 应该被限制为最小1
     }
 
-    public function test_max_connections_limit(): void
+    public function testMaxConnectionsLimit(): void
     {
         $this->manager->setMaxConnections(2);
 
@@ -91,7 +97,7 @@ class ConnectionManagerTest extends TestCase
         $this->manager->addConnection($connection3);
     }
 
-    public function test_get_statistics(): void
+    public function testGetStatistics(): void
     {
         $connection1 = new Connection(false);
         $connection2 = new Connection(true);
@@ -105,21 +111,29 @@ class ConnectionManagerTest extends TestCase
         $this->assertEquals(1000, $stats['max_connections']);
         $this->assertGreaterThanOrEqual(2, $stats['connection_counter']);
         $this->assertArrayHasKey('by_state', $stats);
-        $this->assertEquals(2, $stats['by_state']['new']);
+        $this->assertIsArray($stats['by_state']);
+        $byState = $stats['by_state'];
+        $this->assertEquals(2, $byState['new'] ?? 0);
     }
 
-    public function test_process_pending_tasks(): void
+    public function testProcessPendingTasks(): void
     {
         $connection = new Connection(false);
         $this->manager->addConnection($connection);
 
+        $initialConnectionCount = $this->manager->getConnectionCount();
+
         // 调用processPendingTasks不应该抛出异常
         $this->manager->processPendingTasks();
 
-        $this->assertTrue(true); // 如果没有异常，测试通过
+        // 验证连接数量没有改变（说明方法正常执行）
+        $this->assertEquals($initialConnectionCount, $this->manager->getConnectionCount());
+
+        // 验证连接仍然存在且可以检索
+        $this->assertSame($connection, $this->manager->getConnection($connection->getLocalConnectionId()));
     }
 
-    public function test_cleanup(): void
+    public function testCleanup(): void
     {
         $connection = new Connection(false);
         $this->manager->addConnection($connection);
@@ -135,18 +149,24 @@ class ConnectionManagerTest extends TestCase
         $this->assertEquals(0, $this->manager->getConnectionCount());
     }
 
-    public function test_check_timeouts(): void
+    public function testCheckTimeouts(): void
     {
         $connection = new Connection(false);
         $this->manager->addConnection($connection);
 
+        $initialConnectionCount = $this->manager->getConnectionCount();
+
         // 调用checkTimeouts不应该抛出异常
         $this->manager->checkTimeouts();
 
-        $this->assertTrue(true); // 如果没有异常，测试通过
+        // 验证连接数量没有改变（说明没有连接被超时清理）
+        $this->assertEquals($initialConnectionCount, $this->manager->getConnectionCount());
+
+        // 验证连接仍然存在
+        $this->assertNotNull($this->manager->getConnection($connection->getLocalConnectionId()));
     }
 
-    public function test_close_all_connections(): void
+    public function testCloseAllConnections(): void
     {
         $connection1 = new Connection(false);
         $connection2 = new Connection(false);
@@ -170,7 +190,7 @@ class ConnectionManagerTest extends TestCase
         $this->assertEquals('shutdown', $closeInfo2['reason']);
     }
 
-    public function test_multiple_connections_with_different_ids(): void
+    public function testMultipleConnectionsWithDifferentIds(): void
     {
         $connection1 = new Connection(false);
         $connection2 = new Connection(false);
@@ -187,4 +207,4 @@ class ConnectionManagerTest extends TestCase
         $this->assertSame($connection1, $this->manager->getConnection($connection1->getLocalConnectionId()));
         $this->assertSame($connection2, $this->manager->getConnection($connection2->getLocalConnectionId()));
     }
-} 
+}

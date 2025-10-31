@@ -20,40 +20,39 @@ class PathManager
      * 路径验证挑战数据
      */
     private ?string $validationChallenge = null;
-    
+
     /**
      * 路径验证超时时间
      */
     private ?int $validationTimeout = null;
-    
+
     /**
      * 当前活跃路径
+     * @var array<string, mixed>|null
      */
     private ?array $activePath = null;
-    
+
     /**
      * 正在探测的路径
+     * @var array<string, array<string, mixed>>
      */
     private array $probingPaths = [];
-    
+
     /**
      * 已验证的路径
+     * @var array<string, array<string, mixed>>
      */
     private array $validatedPaths = [];
-    
+
     /**
      * 首选地址
+     * @var array<string, mixed>|null
      */
     private ?array $preferredAddress = null;
-    
-    /**
-     * 是否为服务端
-     */
-    private readonly bool $isServer;
 
-    public function __construct(bool $isServer = false)
-    {
-        $this->isServer = $isServer;
+    public function __construct(
+        private readonly bool $isServer = false,
+    ) {
     }
 
     /**
@@ -78,7 +77,7 @@ class PathManager
     public function probePath(string $localAddress, int $localPort, string $remoteAddress, int $remotePort): void
     {
         $pathKey = $this->getPathKey($localAddress, $localPort, $remoteAddress, $remotePort);
-        
+
         // 检查是否已在探测
         if (isset($this->probingPaths[$pathKey])) {
             return;
@@ -138,19 +137,20 @@ class PathManager
 
         // 找到对应的探测路径并标记为已验证
         foreach ($this->probingPaths as $pathKey => $path) {
-            if ($path['state'] === PathState::PROBING) {
-                $path['state'] = PathState::VALIDATED;
-                $path['validated_at'] = time();
-                
+            if (PathState::PROBING === $path['state']) {
+                $validatedPath = $path;
+                $validatedPath['state'] = PathState::VALIDATED;
+                $validatedPath['validated_at'] = time();
+
                 // 移到已验证路径
-                $this->validatedPaths[$pathKey] = $path;
+                $this->validatedPaths[$pathKey] = $validatedPath;
                 unset($this->probingPaths[$pathKey]);
-                
+
                 // 如果是首选地址路径，切换到此路径
-                if ($this->isPreferredAddressPath($path)) {
-                    $this->switchToPath($pathKey, $path);
+                if ($this->isPreferredAddressPath($validatedPath)) {
+                    $this->switchToPath($pathKey, $validatedPath);
                 }
-                
+
                 break;
             }
         }
@@ -165,28 +165,36 @@ class PathManager
     /**
      * 切换到新路径
      */
+    /**
+     * @param array<string, mixed> $path
+     */
     public function switchToPath(string $pathKey, array $path): void
     {
         // 将当前活跃路径移到已验证路径
-        if ($this->activePath !== null) {
+        if (null !== $this->activePath) {
+            $localAddr = $this->activePath['local_address'];
+            $localPort = $this->activePath['local_port'];
+            $remoteAddr = $this->activePath['remote_address'];
+            $remotePort = $this->activePath['remote_port'];
+
             $oldPathKey = $this->getPathKey(
-                $this->activePath['local_address'],
-                $this->activePath['local_port'],
-                $this->activePath['remote_address'],
-                $this->activePath['remote_port']
+                is_string($localAddr) ? $localAddr : '',
+                is_int($localPort) ? $localPort : 0,
+                is_string($remoteAddr) ? $remoteAddr : '',
+                is_int($remotePort) ? $remotePort : 0
             );
             $this->validatedPaths[$oldPathKey] = $this->activePath;
         }
 
         // 设置新的活跃路径
         $this->activePath = $path;
-        
+
         // 从已验证路径中移除
         unset($this->validatedPaths[$pathKey]);
 
         // TODO: 重置拥塞控制
         // $this->connection->resetCongestionControl();
-        
+
         // TODO: 发送NEW_CONNECTION_ID帧
         // $this->connection->sendNewConnectionId();
     }
@@ -212,14 +220,17 @@ class PathManager
     /**
      * 判断是否为首选地址路径
      */
+    /**
+     * @param array<string, mixed> $path
+     */
     private function isPreferredAddressPath(array $path): bool
     {
-        if ($this->preferredAddress === null) {
+        if (null === $this->preferredAddress) {
             return false;
         }
 
-        return $path['remote_address'] === $this->preferredAddress['address'] &&
-               $path['remote_port'] === $this->preferredAddress['port'];
+        return $path['remote_address'] === $this->preferredAddress['address']
+               && $path['remote_port'] === $this->preferredAddress['port'];
     }
 
     /**
@@ -228,16 +239,17 @@ class PathManager
     public function cleanupTimeoutPaths(): void
     {
         $now = time();
-        
+
         foreach ($this->probingPaths as $pathKey => $path) {
-            if ($now - $path['probe_start'] > 30) { // 30秒超时
+            $probeStart = $path['probe_start'];
+            if (is_int($probeStart) && $now - $probeStart > 30) { // 30秒超时
                 $path['state'] = PathState::FAILED;
                 unset($this->probingPaths[$pathKey]);
             }
         }
 
         // 清理验证超时
-        if ($this->validationTimeout !== null && $now > $this->validationTimeout) {
+        if (null !== $this->validationTimeout && $now > $this->validationTimeout) {
             $this->validationChallenge = null;
             $this->validationTimeout = null;
         }
@@ -253,6 +265,7 @@ class PathManager
 
     /**
      * 获取当前活跃路径
+     * @return array<string, mixed>|null
      */
     public function getActivePath(): ?array
     {
@@ -261,6 +274,7 @@ class PathManager
 
     /**
      * 获取所有已验证路径
+     * @return array<string, array<string, mixed>>
      */
     public function getValidatedPaths(): array
     {
@@ -269,6 +283,7 @@ class PathManager
 
     /**
      * 获取正在探测的路径
+     * @return array<string, array<string, mixed>>
      */
     public function getProbingPaths(): array
     {
@@ -277,40 +292,47 @@ class PathManager
 
     /**
      * 获取首选地址
+     * @return array<string, mixed>|null
      */
     public function getPreferredAddress(): ?array
     {
         return $this->preferredAddress;
     }
-    
+
     /**
      * 获取所有路径（包括活跃、已验证和探测中的）
+     * @return array<int, array<string, mixed>>
      */
     public function getAllPaths(): array
     {
         $paths = [];
-        
+
         // 添加活跃路径
-        if ($this->activePath !== null) {
+        if (null !== $this->activePath) {
+            $localAddr = $this->activePath['local_address'];
+            $localPort = $this->activePath['local_port'];
+            $remoteAddr = $this->activePath['remote_address'];
+            $remotePort = $this->activePath['remote_port'];
+
             $key = $this->getPathKey(
-                $this->activePath['local_address'],
-                $this->activePath['local_port'],
-                $this->activePath['remote_address'],
-                $this->activePath['remote_port']
+                is_string($localAddr) ? $localAddr : '',
+                is_int($localPort) ? $localPort : 0,
+                is_string($remoteAddr) ? $remoteAddr : '',
+                is_int($remotePort) ? $remotePort : 0
             );
             $paths[$key] = $this->activePath;
         }
-        
+
         // 添加已验证路径
         foreach ($this->validatedPaths as $key => $path) {
             $paths[$key] = $path;
         }
-        
+
         // 添加探测中的路径
         foreach ($this->probingPaths as $key => $path) {
             $paths[$key] = $path;
         }
-        
+
         return array_values($paths);
     }
-} 
+}
