@@ -6,7 +6,7 @@
   "require": {
     "symfony/dependency-injection": "^7.3",
     "tourze/arrayable": "1.*",
-    "tourze/enum-extra": "1.*",
+    "tourze/enum-extra": "1.0.*",
     "tourze/quic-congestion": "0.0.*",
     "tourze/quic-core": "0.0.*",
     "tourze/quic-frames": "0.0.*",
